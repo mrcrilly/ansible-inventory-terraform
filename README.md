@@ -1,0 +1,2 @@
+# Ansible Terraform
+[Terraform]() from [Hasicorp]() produces state files that represent your infrastructure. These files aren't directly compatiable with Ansible inventory structure, but they can be mutated to be. This is where this utility steps in for you.
