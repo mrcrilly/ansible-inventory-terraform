@@ -8,3 +8,7 @@ resource "digitalocean_droplet" "web" {
   ssh_keys = ["1207665"] # [MBP Home]
   private_networking = true
 }
+
+module "db" {
+  source = "./database"
+}
