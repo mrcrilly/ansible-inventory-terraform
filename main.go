@@ -22,7 +22,6 @@ type AnsibleInventoryHost struct {
 
 type StateProcessor interface {
 	Process(*terraform.State) error
-	Group(string) (string, error)
 	Host(string) (string, error)
 	Inventory() (string, error)
 	InventoryRaw() (map[string]*AnsibleInventoryGroup, error)

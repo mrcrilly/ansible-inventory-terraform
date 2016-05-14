@@ -50,10 +50,6 @@ func (self *DigitalOceanProcessor) Process(t *terraform.State) error {
 	return nil
 }
 
-func (self *DigitalOceanProcessor) Group(g string) (string, error) {
-	return "{}", nil
-}
-
 func (self *DigitalOceanProcessor) Host(h string) (string, error) {
 	var hostVariables map[string]interface{}
 
