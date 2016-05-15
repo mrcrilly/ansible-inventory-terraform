@@ -14,10 +14,10 @@ resource "aws_subnet" "primary" {
   cidr_block = "10.1.1.0/24"
 }
 
-# module "webservers" {
-#   source = "./webserver"
-#   subnet = "${aws_subnet.primary.id}"
-# }
+module "webservers" {
+  source = "./webserver"
+  subnet = "${aws_subnet.primary.id}"
+}
 
 module "loadbalancers" {
   source = "./loadbalancer"

@@ -10,5 +10,5 @@ module "webservers_dev" {
 }
 
 module "loadbalancers" {
-  source = "./loadbalancer"
+  source = "./loadbalancers"
 }

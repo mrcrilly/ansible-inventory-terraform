@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 import (
@@ -11,8 +12,9 @@ import (
 )
 
 type DigitalOceanProcessor struct {
-	State     *terraform.State
-	inventory map[string]*AnsibleInventoryGroup
+	State       *terraform.State
+	inventory   map[string]*AnsibleInventoryGroup
+	floatingIPs map[string]string
 }
 
 func (self *DigitalOceanProcessor) Process(t *terraform.State) error {
@@ -21,29 +23,36 @@ func (self *DigitalOceanProcessor) Process(t *terraform.State) error {
 	}
 
 	self.State = t
+	self.floatingIPs = make(map[string]string, 0)
 
 	if self.inventory == nil {
 		self.inventory = make(map[string]*AnsibleInventoryGroup, 0)
 	}
 
 	for _, module := range t.Modules {
-		groupName := module.Path[len(module.Path)-1]
-
-		if len(module.Resources) == 0 {
-			continue
-		}
-
-		if _, ok := self.inventory[groupName]; !ok {
-			self.inventory[groupName] = new(AnsibleInventoryGroup)
-		}
-
 		for _, resourceValue := range module.Resources {
-			entry := fmt.Sprintf(
-				"%s",
-				resourceValue.Primary.Attributes["name"],
-			)
+			switch resourceValue.Type {
+			case "digitalocean_droplet":
+				if len(module.Resources) == 0 {
+					continue
+				}
 
-			self.inventory[groupName].Hosts = append(self.inventory[groupName].Hosts, entry)
+				groupName := module.Path[len(module.Path)-1]
+
+				if _, ok := self.inventory[groupName]; !ok {
+					self.inventory[groupName] = new(AnsibleInventoryGroup)
+				}
+
+				entry := fmt.Sprintf("%s", resourceValue.Primary.Attributes["name"])
+				self.inventory[groupName].Hosts = append(self.inventory[groupName].Hosts, entry)
+				break
+			case "digitalocean_floating_ip":
+				depName := strings.Split(resourceValue.Dependencies[0], ".")[1]
+				self.floatingIPs[depName] = resourceValue.Primary.Attributes["ip_address"]
+				break
+			default:
+				continue
+			}
 		}
 	}
 
@@ -59,11 +68,24 @@ func (self *DigitalOceanProcessor) Host(h string) (string, error) {
 
 	for _, module := range self.State.Modules {
 		for _, resource := range module.Resources {
-			if resource.Primary.Attributes["name"] == h {
-				hostVariables = make(map[string]interface{}, 0)
+			switch resource.Type {
+			case "digitalocean_droplet":
+				if resource.Primary.Attributes["name"] == h {
+					hostVariables = make(map[string]interface{}, 0)
 
-				hostVariables["ansible_ssh_host"] = resource.Primary.Attributes["ipv4_address"]
-				hostVariables["ansible_ssh_user"] = "root"
+					hostVariables["ansible_ssh_host"] = resource.Primary.Attributes["ipv4_address"]
+
+					if ipv4_private, ok := resource.Primary.Attributes["ipv4_address_private"]; ok {
+						hostVariables["private_ip"] = ipv4_private
+					}
+
+					if _, ok := self.floatingIPs[h]; ok {
+						hostVariables["floating_ip"] = self.floatingIPs[h]
+					}
+				}
+				break
+			default:
+				continue
 			}
 		}
 	}
@@ -87,7 +109,6 @@ func (self *DigitalOceanProcessor) Inventory() (string, error) {
 	}
 
 	if len(self.inventory) == 0 {
-		// empty still requires a response to Ansible
 		return "{}", nil
 	}
 

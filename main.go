@@ -12,21 +12,6 @@ import (
 	"github.com/hashicorp/terraform/terraform"
 )
 
-type AnsibleInventoryGroup struct {
-	Hosts []string `json:"hosts"`
-}
-
-type AnsibleInventoryHost struct {
-	Variables map[string]interface{}
-}
-
-type StateProcessor interface {
-	Process(*terraform.State) error
-	Host(string) (string, error)
-	Inventory() (string, error)
-	InventoryRaw() (map[string]*AnsibleInventoryGroup, error)
-}
-
 func checkError(err error) {
 	if err != nil {
 		panic(err)
@@ -55,7 +40,6 @@ func main() {
 	checkError(err)
 
 	var flagEverything = flag.Bool("list", true, "--list: will give you the entire inventory")
-	var flagGroup = flag.String("group", "", "--group <group>: will give you a list of hosts in a group")
 	var flagHost = flag.String("host", "", "--host <host>: will give host specific variables")
 
 	flag.Parse()
@@ -66,6 +50,8 @@ func main() {
 	switch envProvider {
 	case "digitalocean":
 		processor = new(DigitalOceanProcessor)
+	case "aws":
+		processor = new(AWSProcessor)
 	default:
 		panic(errors.New("No provider specified in ANSIBLE_INVENTORY_TERRAFORM_PROVIDER"))
 	}
@@ -75,11 +61,6 @@ func main() {
 	if *flagHost != "" {
 		*flagEverything = false
 		processorOut, err = processor.Host(*flagHost)
-	}
-
-	if *flagGroup != "" {
-		*flagEverything = false
-		processorOut, err = processor.Group(*flagGroup)
 	}
 
 	if *flagEverything {
